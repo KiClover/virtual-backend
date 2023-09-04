@@ -88,6 +88,18 @@ func (e *Record) Insert(c *dto.RecordInsertReq) error {
 	return nil
 }
 
+func (e *Record) InsertTask(c *dto.RecordInsertTaskReq) error {
+	var err error
+	var data models.Record
+	c.GenerateTask(&data)
+	err = e.Orm.Create(&data).Error
+	if err != nil {
+		e.Log.Errorf("RecordService Insert error:%s \r\n", err)
+		return err
+	}
+	return nil
+}
+
 // Update 修改Record对象
 func (e *Record) Update(c *dto.RecordUpdateReq, p *actions.DataPermission) error {
 	var err error

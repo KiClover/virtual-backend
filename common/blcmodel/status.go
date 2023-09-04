@@ -1,13 +1,6 @@
-package middleware
+package blcmodel
 
-import (
-	"bytes"
-	"encoding/json"
-	"golang.org/x/net/html/charset"
-	"io"
-	"io/ioutil"
-	"net/http"
-)
+import "encoding/json"
 
 type Response struct {
 	UserInfo   UserInfo   `json:"user_info"`
@@ -59,26 +52,4 @@ type TaskStatus struct {
 	PostprocessorStatus    string          `json:"postprocessor_status"`
 	PostprocessingPath     json.RawMessage `json:"postprocessing_path"`
 	PostprocessingProgress json.RawMessage `json:"postprocessing_progress"`
-}
-
-func RecRequest(method string, url string, key string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequest(method, url, body)
-	req.Header.Set("x-api-key", key)
-	resp, err := http.DefaultClient.Do(req)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
-		}
-	}(resp.Body)
-	respbody, err := ioutil.ReadAll(resp.Body)
-	return respbody, err
-}
-
-func decodeCharset(data []byte, charsets string) ([]byte, error) {
-	r, err := charset.NewReaderLabel(charsets, bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	return ioutil.ReadAll(r)
 }

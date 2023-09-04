@@ -11,8 +11,6 @@ import (
 	"go-admin/app/record/service"
 	"go-admin/app/record/service/dto"
 	"go-admin/common/actions"
-	"io"
-	"net/http"
 	"strconv"
 )
 
@@ -197,12 +195,11 @@ func (e Record) Delete(c *gin.Context) {
 	e.OK(req.GetId(), "删除成功")
 }
 
-// GetStatus Get 获取录播任务管理
-// @Summary 获取录播任务管理
-// @Description 获取录播任务管理
-// @Tags 录播任务管理
-// @Param id path int false "id"
-// @Success 200 {object} response.Response{data=models.Record} "{"code": 200, "data": [...]}"
+// GetStatus Get 获取录播任务状态
+// @Summary 获取录播任务状态
+// @Description 获取录播任务状态
+// @Tags 录播任务状态
+// @Success 200 {object} response.Response "{"code": 200, "data": [...]}"
 // @Router /api/v1/record/status [get]
 // @Security Bearer
 func (e Record) GetStatus(c *gin.Context) {
@@ -236,28 +233,41 @@ func (e Record) GetStatus(c *gin.Context) {
 	}
 	roomid := strconv.FormatInt(object.RoomId, 10)
 	// 向节点后端发送请求
-	resp, err := RecRequest("GET",
+	resp, err := actions.RecRequest("GET",
 		objectnode.Address+"/api/v1/tasks/"+roomid+"/data",
-		objectnode.Key)
+		objectnode.Key, nil)
 	if err != nil {
 		e.Error(500, err, fmt.Sprintf("向录播节点发送请求失败，\r\n失败信息 %s", err.Error()))
 		return
 	}
+	if resp.RoomInfo.RoomID != int(object.RoomId) {
+		e.Error(903, nil, "未向边缘录播节点取得录播任务数据")
+		return
+	}
 	e.OK(resp, "获取成功")
-	// e.OK(objectnode.Key, "ok")
-	// c.Data(http.StatusOK, "application/json", resp)
 }
 
-func RecRequest(method string, url string, key string) ([]byte, error) {
-	req, err := http.NewRequest(method, url, nil)
-	req.Header.Set("x-api-key", key)
-	resp, err := http.DefaultClient.Do(req)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
+func (e Record) InsertTask(c *gin.Context) {
+	req := dto.RecordInsertReq{}
+	s := service.Record{}
+	err := e.MakeContext(c).
+		MakeOrm().
+		Bind(&req).
+		MakeService(&s.Service).
+		Errors
+	if err != nil {
+		e.Logger.Error(err)
+		e.Error(500, err, err.Error())
+		return
+	}
+	// 设置创建人
+	req.SetCreateBy(user.GetUserId(c))
 
-		}
-	}(resp.Body)
-	respbody, err := io.ReadAll(resp.Body)
-	return respbody, err
+	err = s.Insert(&req)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("创建录播任务管理失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+
+	e.OK(req.GetId(), "创建成功")
 }
