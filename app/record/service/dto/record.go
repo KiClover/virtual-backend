@@ -64,6 +64,9 @@ type RecordInsertTaskReq struct {
 	common.ControlBy
 }
 
+func (s *RecordInsertReq) GetId() interface{} {
+	return s.Id
+}
 func (s *RecordInsertTaskReq) GenerateTask(model *models.Record) {
 	if s.Id == 0 {
 		model.Model = common.Model{Id: s.Id}
@@ -71,10 +74,11 @@ func (s *RecordInsertTaskReq) GenerateTask(model *models.Record) {
 	model.RoomId = s.RoomId
 	model.StreamerId = s.StreamerId
 	model.StreamerName = s.StreamerName
+	model.DeptId = 0
 	model.CreateBy = s.CreateBy // 添加这而，需要记录是被谁创建的
 }
 
-func (s *RecordInsertReq) GetId() interface{} {
+func (s *RecordInsertTaskReq) GetId() interface{} {
 	return s.Id
 }
 

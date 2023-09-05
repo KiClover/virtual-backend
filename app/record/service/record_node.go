@@ -73,6 +73,65 @@ func (e *RecordNode) GetNodeConfig(nodeid int64, model *models.RecordNode) error
 	return nil
 }
 
+// SearchFreeNode 查询可用节点
+func (e *RecordNode) SearchFreeNode() (int, error) {
+	var data models.RecordNode
+
+	err := e.Orm.Model(&data).
+		Order("id asc").
+		Select("id, max, task").
+		Scan(&data).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	for {
+		if data.Task < data.Max {
+			return data.Id, nil
+		}
+
+		err = e.Orm.Model(&data).
+			Where("id > ?", data.Id).
+			Order("id asc").
+			Select("id, max, task").
+			Scan(&data).
+			Error
+
+		if data.Id == 0 {
+			break
+		}
+	}
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		err = errors.New("查看对象不存在或无权查看")
+		e.Log.Errorf("Service GetRecordNode error:%s \r\n", err)
+		return 0, err
+	}
+	if err != nil {
+		e.Log.Errorf("db error:%s", err)
+		return 0, err
+	}
+
+	return 0, nil
+}
+func (e *RecordNode) UpdateNodeTasks(node int64) error {
+	var data models.RecordNode
+	var tasks int
+	var err error
+	err = e.Orm.Model(&data).Select("task").Where("id = ?", node).Scan(&tasks).Error
+	if err != nil {
+		e.Log.Errorf("查询节点任务数量错误:%s \r\n", err)
+		return err
+	}
+	tasks = tasks + 1
+	err = e.Orm.Model(&data).Where("id = ?", node).Update("task", tasks).Error
+	if err != nil {
+		e.Log.Errorf("更新节点任务数量错误:%s \r\n", err)
+		return err
+	}
+	return nil
+}
+
 // Insert 创建RecordNode对象
 func (e *RecordNode) Insert(c *dto.RecordNodeInsertReq) error {
 	var err error

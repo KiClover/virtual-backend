@@ -233,7 +233,7 @@ func (e Record) GetStatus(c *gin.Context) {
 	}
 	roomid := strconv.FormatInt(object.RoomId, 10)
 	// 向节点后端发送请求
-	resp, err := actions.RecRequest("GET",
+	resp, err := actions.RecStatus("GET",
 		objectnode.Address+"/api/v1/tasks/"+roomid+"/data",
 		objectnode.Key, nil)
 	if err != nil {
@@ -248,26 +248,51 @@ func (e Record) GetStatus(c *gin.Context) {
 }
 
 func (e Record) InsertTask(c *gin.Context) {
-	req := dto.RecordInsertReq{}
-	s := service.Record{}
+	req := dto.RecordInsertTaskReq{}
+	sr := service.Record{}
+	sn := service.RecordNode{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req).
-		MakeService(&s.Service).
+		MakeService(&sr.Service).
+		MakeService(&sn.Service).
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
 		e.Error(500, err, err.Error())
 		return
 	}
+	p := actions.GetPermissionFromContext(c)
 	// 设置创建人
 	req.SetCreateBy(user.GetUserId(c))
-
-	err = s.Insert(&req)
-	if err != nil {
-		e.Error(500, err, fmt.Sprintf("创建录播任务管理失败，\r\n失败信息 %s", err.Error()))
+	// 获取可用节点
+	node, err := sn.SearchFreeNode()
+	if node == 0 {
+		e.Error(500, nil, "无可用节点")
 		return
 	}
-
-	e.OK(req.GetId(), "创建成功")
+	// 创建节点
+	err = sr.InsertTask(p, &req, int64(node))
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("创建录播任务至数据库失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	// 向录播后端请求
+	var objectnode models.RecordNode
+	roomid := strconv.FormatInt(req.RoomId, 10)
+	err = sn.GetNodeConfig(int64(node), &objectnode)
+	err = actions.RecRequest("POST",
+		objectnode.Address+"/api/v1/tasks/"+roomid,
+		objectnode.Key, nil)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("向后端发送请求失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	// 更新数据库节点余量信息
+	err = sn.UpdateNodeTasks(int64(node))
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("更新录播节点任务数量失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	e.OK(req.GetId(), "创建录播任务成功")
 }

@@ -53,3 +53,7 @@ type TaskStatus struct {
 	PostprocessingPath     json.RawMessage `json:"postprocessing_path"`
 	PostprocessingProgress json.RawMessage `json:"postprocessing_progress"`
 }
+
+type ErrResponse struct {
+	Code int `json:"code"`
+}

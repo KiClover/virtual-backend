@@ -88,10 +88,21 @@ func (e *Record) Insert(c *dto.RecordInsertReq) error {
 	return nil
 }
 
-func (e *Record) InsertTask(c *dto.RecordInsertTaskReq) error {
+func (e *Record) InsertTask(p *actions.DataPermission, c *dto.RecordInsertTaskReq, node int64) error {
 	var err error
 	var data models.Record
 	c.GenerateTask(&data)
+	var i int64
+	err = e.Orm.Model(&data).
+		Scopes(
+			actions.Permission(data.TableName(), p),
+		).
+		Count(&i).Error
+	if i > 0 {
+		err = errors.New("数据库已经记录录播任务，不可创建")
+		return err
+	}
+	data.NodeId = node
 	err = e.Orm.Create(&data).Error
 	if err != nil {
 		e.Log.Errorf("RecordService Insert error:%s \r\n", err)
