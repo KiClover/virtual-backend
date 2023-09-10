@@ -2,7 +2,6 @@ package service
 
 import (
 	"errors"
-
 	"github.com/go-admin-team/go-admin-core/sdk/service"
 	"gorm.io/gorm"
 
@@ -131,7 +130,7 @@ func (e *Record) Update(c *dto.RecordUpdateReq, p *actions.DataPermission) error
 	return nil
 }
 
-func (e *Record) UpdateByDept(c *dto.RecordUpdateReq, p *actions.DataPermission) error {
+func (e *Record) UpdateByRoomId(c *dto.RecordUpdateReq, p *actions.DataPermission) error {
 	var err error
 	var data = models.Record{}
 	e.Orm.Scopes(
@@ -158,6 +157,23 @@ func (e *Record) Remove(d *dto.RecordDeleteReq, p *actions.DataPermission) error
 		Scopes(
 			actions.Permission(data.TableName(), p),
 		).Delete(&data, d.GetId())
+	if err := db.Error; err != nil {
+		e.Log.Errorf("Service RemoveRecord error:%s \r\n", err)
+		return err
+	}
+	if db.RowsAffected == 0 {
+		return errors.New("无权删除该数据")
+	}
+	return nil
+}
+
+func (e *Record) RemoveTask(d *dto.RecordTaskDeleteReq, p *actions.DataPermission) error {
+	var data models.Record
+
+	db := e.Orm.Model(&data).
+		Scopes(
+			actions.Permission(data.TableName(), p),
+		).Where("room_id = ?", d.GetRoomId()).Delete(&data)
 	if err := db.Error; err != nil {
 		e.Log.Errorf("Service RemoveRecord error:%s \r\n", err)
 		return err

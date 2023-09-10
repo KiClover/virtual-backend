@@ -98,7 +98,8 @@ func (e *RecordNode) SearchFreeNode() (int, error) {
 			Scan(&data).
 			Error
 
-		if data.Id == 0 {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 没有满足条件的数据，退出循环
 			break
 		}
 	}
@@ -124,6 +125,24 @@ func (e *RecordNode) UpdateNodeTasks(node int64) error {
 		return err
 	}
 	tasks = tasks + 1
+	err = e.Orm.Model(&data).Where("id = ?", node).Update("task", tasks).Error
+	if err != nil {
+		e.Log.Errorf("更新节点任务数量错误:%s \r\n", err)
+		return err
+	}
+	return nil
+}
+
+func (e *RecordNode) ReturnNodeTasks(node int64) error {
+	var data models.RecordNode
+	var tasks int
+	var err error
+	err = e.Orm.Model(&data).Select("task").Where("id = ?", node).Scan(&tasks).Error
+	if err != nil {
+		e.Log.Errorf("查询节点任务数量错误:%s \r\n", err)
+		return err
+	}
+	tasks = tasks - 1
 	err = e.Orm.Model(&data).Where("id = ?", node).Update("task", tasks).Error
 	if err != nil {
 		e.Log.Errorf("更新节点任务数量错误:%s \r\n", err)

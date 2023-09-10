@@ -56,17 +56,19 @@ func (s *RecordInsertReq) Generate(model *models.Record) {
 	model.CreateBy = s.CreateBy // 添加这而，需要记录是被谁创建的
 }
 
+func (s *RecordInsertReq) GetId() interface{} {
+	return s.Id
+}
+
 type RecordInsertTaskReq struct {
 	Id           int    `json:"-" comment:"编码"` // 编码
 	RoomId       int64  `json:"roomId" comment:"直播间ID"`
 	StreamerId   int64  `json:"streamerId" comment:"主播ID"`
 	StreamerName string `json:"streamerName" comment:"主播名称"`
+	DeptId       int64  `json:"deptId" comment:"组ID"`
 	common.ControlBy
 }
 
-func (s *RecordInsertReq) GetId() interface{} {
-	return s.Id
-}
 func (s *RecordInsertTaskReq) GenerateTask(model *models.Record) {
 	if s.Id == 0 {
 		model.Model = common.Model{Id: s.Id}
@@ -74,7 +76,7 @@ func (s *RecordInsertTaskReq) GenerateTask(model *models.Record) {
 	model.RoomId = s.RoomId
 	model.StreamerId = s.StreamerId
 	model.StreamerName = s.StreamerName
-	model.DeptId = 0
+	model.DeptId = s.DeptId
 	model.CreateBy = s.CreateBy // 添加这而，需要记录是被谁创建的
 }
 
@@ -124,4 +126,13 @@ type RecordDeleteReq struct {
 
 func (s *RecordDeleteReq) GetId() interface{} {
 	return s.Ids
+}
+
+type RecordTaskDeleteReq struct {
+	RoomId int `json:"roomId"`
+	common.ControlBy
+}
+
+func (s *RecordTaskDeleteReq) GetRoomId() interface{} {
+	return s.RoomId
 }

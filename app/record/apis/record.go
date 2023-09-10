@@ -262,15 +262,17 @@ func (e Record) InsertTask(c *gin.Context) {
 		e.Error(500, err, err.Error())
 		return
 	}
-	p := actions.GetPermissionFromContext(c)
-	// 设置创建人
 	req.SetCreateBy(user.GetUserId(c))
+	p := actions.GetPermissionFromContext(c)
+	// 设置创建人/部门
+
 	// 获取可用节点
 	node, err := sn.SearchFreeNode()
 	if node == 0 {
-		e.Error(500, nil, "无可用节点")
+		e.Error(500, nil, "无可用节点,请联系管理员")
 		return
 	}
+
 	// 创建节点
 	err = sr.InsertTask(p, &req, int64(node))
 	if err != nil {
@@ -294,5 +296,114 @@ func (e Record) InsertTask(c *gin.Context) {
 		e.Error(500, err, fmt.Sprintf("更新录播节点任务数量失败，\r\n失败信息 %s", err.Error()))
 		return
 	}
-	e.OK(req.GetId(), "创建录播任务成功")
+	e.OK(req.DeptId, "创建录播任务成功")
+}
+
+func (e Record) DelTask(c *gin.Context) {
+	req := dto.RecordTaskDeleteReq{}
+	sr := service.Record{}
+	sn := service.RecordNode{}
+	err := e.MakeContext(c).
+		MakeOrm().
+		Bind(&req).
+		MakeService(&sr.Service).
+		MakeService(&sn.Service).
+		Errors
+	if err != nil {
+		e.Logger.Error(err)
+		e.Error(500, err, err.Error())
+		return
+	}
+	p := actions.GetPermissionFromContext(c)
+	// 设置创建人/部门
+	var object models.Record
+	var objectnode models.RecordNode
+	noexist, err := sr.GetRecordByDept(p, &object)
+	// 验证数据库内录播任务是否存在
+	if noexist == 1 {
+		err = errors.New("数据库中未记录录播任务")
+		e.Error(901, err, "任务错误，无法获取数据库中的任务详情")
+		return
+	}
+
+	// 删除节点
+	err = sr.RemoveTask(&req, p)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("创建录播任务至数据库失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	// 获取节点详情
+	err = sn.GetNodeConfig(object.NodeId, &objectnode)
+	if err != nil {
+		e.Error(902, err, fmt.Sprintf("获取录播节点信息管理失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	// 向录播后端请求
+	err = actions.RecRequest("DELETE",
+		objectnode.Address+"/api/v1/tasks/"+strconv.Itoa(req.RoomId),
+		objectnode.Key, nil)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("向后端发送请求失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	// 更新数据库节点余量信息
+	err = sn.ReturnNodeTasks(object.NodeId)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("更新录播节点任务数量失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	e.OK(req.RoomId, "创建录播任务成功")
+}
+
+func (e Record) UpdateTask(c *gin.Context) {
+	req := dto.RecordUpdateReq{}
+	sr := service.Record{}
+	sn := service.RecordNode{}
+	err := e.MakeContext(c).
+		MakeOrm().
+		Bind(&req).
+		MakeService(&sr.Service).
+		MakeService(&sn.Service).
+		Errors
+	if err != nil {
+		e.Logger.Error(err)
+		e.Error(500, err, err.Error())
+		return
+	}
+	req.SetUpdateBy(user.GetUserId(c))
+	p := actions.GetPermissionFromContext(c)
+	// 设置创建人/部门
+	var object models.Record
+	var objectnode models.RecordNode
+	noexist, err := sr.GetRecordByDept(p, &object)
+	// 验证数据库内录播任务是否存在
+	if noexist == 1 {
+		err = errors.New("数据库中未记录录播任务")
+		e.Error(901, err, "任务错误，无法获取数据库中的任务详情")
+		return
+	}
+	// 更新节点
+	err = sr.UpdateByRoomId(&req, p)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("创建录播任务至数据库失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	// 向录播后端请求
+	if req.RoomId != 0 {
+		roomid := strconv.FormatInt(req.RoomId, 10)
+		err = sn.GetNodeConfig(req.RoomId, &objectnode)
+		// 删除原先录播任务
+		err = actions.RecRequest("DELETE",
+			objectnode.Address+"/api/v1/tasks/"+string(object.RoomId),
+			objectnode.Key, nil)
+		//创建新任务
+		err = actions.RecRequest("POST",
+			objectnode.Address+"/api/v1/tasks/"+roomid,
+			objectnode.Key, nil)
+		if err != nil {
+			e.Error(500, err, fmt.Sprintf("向后端发送请求失败，\r\n失败信息 %s", err.Error()))
+			return
+		}
+	}
+	e.OK(req.DeptId, "创建录播任务成功")
 }

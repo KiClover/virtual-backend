@@ -25,5 +25,6 @@ func registerRecordRouter(v1 *gin.RouterGroup, authMiddleware *jwt.GinJWTMiddlew
 		r.DELETE("", api.Delete)
 		r.GET("/status", actions.PermissionAction(), api.GetStatus)
 		r.POST("/creat", actions.PermissionAction(), api.InsertTask)
+		r.DELETE("/", actions.PermissionAction(), api.DelTask)
 	}
 }
