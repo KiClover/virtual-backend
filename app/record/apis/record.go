@@ -247,6 +247,29 @@ func (e Record) GetStatus(c *gin.Context) {
 	e.OK(resp, "获取成功")
 }
 
+func (e Record) GetConfig(c *gin.Context) {
+	sr := service.Record{}
+	err := e.MakeContext(c).
+		MakeOrm().
+		MakeService(&sr.Service).
+		Errors
+	if err != nil {
+		e.Logger.Error(err)
+		e.Error(500, err, err.Error())
+		return
+	}
+	var object models.Record
+	p := actions.GetPermissionFromContext(c)
+	noexist, err := sr.GetRecordByDept(p, &object)
+	// 验证数据库内录播任务是否存在
+	if noexist == 1 {
+		err = errors.New("数据库中未记录录播任务")
+		e.Error(901, err, "任务错误，无法获取数据库中的任务详情")
+		return
+	}
+	e.OK(object, "获取成功")
+}
+
 func (e Record) InsertTask(c *gin.Context) {
 	req := dto.RecordInsertTaskReq{}
 	sr := service.Record{}
@@ -394,7 +417,7 @@ func (e Record) UpdateTask(c *gin.Context) {
 		err = sn.GetNodeConfig(req.RoomId, &objectnode)
 		// 删除原先录播任务
 		err = actions.RecRequest("DELETE",
-			objectnode.Address+"/api/v1/tasks/"+string(object.RoomId),
+			objectnode.Address+"/api/v1/tasks/"+strconv.FormatInt(object.RoomId, 10),
 			objectnode.Key, nil)
 		//创建新任务
 		err = actions.RecRequest("POST",
@@ -406,4 +429,127 @@ func (e Record) UpdateTask(c *gin.Context) {
 		}
 	}
 	e.OK(req.DeptId, "创建录播任务成功")
+}
+
+func (e Record) StartTask(c *gin.Context) {
+	sr := service.Record{}
+	sn := service.RecordNode{}
+	err := e.MakeContext(c).
+		MakeOrm().
+		MakeService(&sr.Service).
+		MakeService(&sn.Service).
+		Errors
+	if err != nil {
+		e.Logger.Error(err)
+		e.Error(500, err, err.Error())
+		return
+	}
+	var object models.Record
+	var objectnode models.RecordNode
+	p := actions.GetPermissionFromContext(c)
+	noexist, err := sr.GetRecordByDept(p, &object)
+	// 验证数据库内录播任务是否存在
+	if noexist == 1 {
+		err = errors.New("数据库中未记录录播任务")
+		e.Error(901, err, "任务错误，无法获取数据库中的任务详情")
+		return
+	}
+	// 获取节点信息
+	err = sn.GetNodeConfig(object.NodeId, &objectnode)
+	if err != nil {
+		e.Error(902, err, fmt.Sprintf("获取录播节点信息管理失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	roomid := strconv.FormatInt(object.RoomId, 10)
+	// 向节点后端发送请求
+	err = actions.RecRequest("POST",
+		objectnode.Address+"/api/v1/tasks/"+roomid+"/start",
+		objectnode.Key, nil)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("向录播节点发送请求失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	e.OK(object.RoomId, "开启任务成功")
+}
+
+func (e Record) StopTask(c *gin.Context) {
+	sr := service.Record{}
+	sn := service.RecordNode{}
+	err := e.MakeContext(c).
+		MakeOrm().
+		MakeService(&sr.Service).
+		MakeService(&sn.Service).
+		Errors
+	if err != nil {
+		e.Logger.Error(err)
+		e.Error(500, err, err.Error())
+		return
+	}
+	var object models.Record
+	var objectnode models.RecordNode
+	p := actions.GetPermissionFromContext(c)
+	noexist, err := sr.GetRecordByDept(p, &object)
+	// 验证数据库内录播任务是否存在
+	if noexist == 1 {
+		err = errors.New("数据库中未记录录播任务")
+		e.Error(901, err, "任务错误，无法获取数据库中的任务详情")
+		return
+	}
+	// 获取节点信息
+	err = sn.GetNodeConfig(object.NodeId, &objectnode)
+	if err != nil {
+		e.Error(902, err, fmt.Sprintf("获取录播节点信息管理失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	roomid := strconv.FormatInt(object.RoomId, 10)
+	// 向节点后端发送请求
+	err = actions.RecRequest("POST",
+		objectnode.Address+"/api/v1/tasks/"+roomid+"/stop",
+		objectnode.Key, nil)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("向录播节点发送请求失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	e.OK(object.RoomId, "停止任务成功")
+}
+
+func (e Record) CutTask(c *gin.Context) {
+	sr := service.Record{}
+	sn := service.RecordNode{}
+	err := e.MakeContext(c).
+		MakeOrm().
+		MakeService(&sr.Service).
+		MakeService(&sn.Service).
+		Errors
+	if err != nil {
+		e.Logger.Error(err)
+		e.Error(500, err, err.Error())
+		return
+	}
+	var object models.Record
+	var objectnode models.RecordNode
+	p := actions.GetPermissionFromContext(c)
+	noexist, err := sr.GetRecordByDept(p, &object)
+	// 验证数据库内录播任务是否存在
+	if noexist == 1 {
+		err = errors.New("数据库中未记录录播任务")
+		e.Error(901, err, "任务错误，无法获取数据库中的任务详情")
+		return
+	}
+	// 获取节点信息
+	err = sn.GetNodeConfig(object.NodeId, &objectnode)
+	if err != nil {
+		e.Error(902, err, fmt.Sprintf("获取录播节点信息管理失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	roomid := strconv.FormatInt(object.RoomId, 10)
+	// 向节点后端发送请求
+	err = actions.RecRequest("POST",
+		objectnode.Address+"/api/v1/tasks/"+roomid+"/cut",
+		objectnode.Key, nil)
+	if err != nil {
+		e.Error(500, err, fmt.Sprintf("向录播节点发送请求失败，\r\n失败信息 %s", err.Error()))
+		return
+	}
+	e.OK(object.RoomId, "切断任务成功")
 }
